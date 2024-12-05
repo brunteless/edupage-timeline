@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Timeline</string>
+    <string name="timeline_widget_description">Shows your EduPage timeline.</string>
+</resources>
