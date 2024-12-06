@@ -42,7 +42,7 @@ class EdupageRepository(
             .toTokens()
     }
 
-    suspend fun getTimeline(tokens: Tokens, day: LocalDateTime) : RenderTimeline {
+    suspend fun getTimeline(tokens: Tokens, day: LocalDateTime) : RenderTimeline? {
 
         val timeline = httpClient
             .submitForm(tokens.timelineUrl, makeTimelineParameters(tokens, day)) {
@@ -51,6 +51,7 @@ class EdupageRepository(
             .body<EdupageTimelineDto>()
             .toLessonList(dateFormat.format(day))
 
+        if (timeline.isEmpty()) return null
 
         val (orderedTimeline, newIndex) = timeline.withProperOrder()
 

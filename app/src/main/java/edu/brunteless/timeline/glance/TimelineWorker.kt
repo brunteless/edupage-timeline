@@ -111,7 +111,7 @@ class TimelineWorker(
     }
 
     private suspend fun getTimeline(shouldBeNextDay: Boolean): RenderTimeline {
-        var timeline: RenderTimeline
+        var timeline: RenderTimeline?
 
         withContext(Dispatchers.IO) {
             val id = glanceManager.getGlanceIds(TimelineGlanceWidget::class.java).first()
@@ -130,10 +130,10 @@ class TimelineWorker(
                 timeline = edupageRepository.getTimeline(tokens, currentDay)
                 currentDay = currentDay.plusDays(1)
 
-            } while (timeline.isNotLatest)
+            } while (timeline?.isNotLatest != false)
         }
 
-        return timeline
+        return timeline!!
     }
 
     private fun getCurrentDay(

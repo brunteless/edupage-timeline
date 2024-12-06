@@ -62,7 +62,7 @@ class MainActivity : ComponentActivity() {
                                         val timeline = repository.getTimeline(
                                             login, LocalDateTime.now()
                                         )
-                                        lessons = timeline.lessons
+                                        lessons = timeline?.lessons ?: emptyList()
                                     }
                                 }
                             ) {

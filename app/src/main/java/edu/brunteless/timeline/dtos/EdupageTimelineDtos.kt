@@ -180,16 +180,16 @@ data class DailyPlanData(
 data class Lesson(
     val type: String,
     val uniperiod: String,
-    val header: List<HeaderItem>,
-    val infos: List<Info>? = null,
+//    val header: List<HeaderItem>,
+//    val infos: List<Info>? = null,
     val subjectid: String? = null,
-    val classids: List<String>,
-    val teacherids: List<String>,
-    val classroomids: List<String>,
-    val groupnames: List<String>,
-    val lid: String? = null,
-    val groupsubjectids: List<String>,
-    val periodorbreak: String,
+//    val classids: List<String>,
+    val teacherids: List<String> = emptyList(),
+    val classroomids: List<String> = emptyList(),
+//    val groupnames: List<String>,
+//    val lid: String? = null,
+//    val groupsubjectids: List<String>,
+//    val periodorbreak: String,
     val starttime: String? = null,
     val endtime: String? = null,
     val period: String? = null
@@ -197,7 +197,7 @@ data class Lesson(
 
 @Serializable
 data class HeaderItem(
-    val item: HeaderItemDetail
+    val item: HeaderItemDetail? = null
 )
 
 @Serializable
