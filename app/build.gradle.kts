@@ -13,9 +13,9 @@ android {
     defaultConfig {
         applicationId = "edu.brunteless.timeline"
         minSdk = 28
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
-        versionName = "1.0"
+        versionName = "0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -68,5 +68,11 @@ dependencies {
 
     implementation(libs.androidx.work.runtime.ktx)
 
+    implementation(libs.koin.core)
+    implementation(libs.koin.compose)
+    implementation(libs.koin.android)
+    implementation(libs.koin.navigation)
+
+    implementation(libs.kotlinx.serialization.json.io)
 
 }

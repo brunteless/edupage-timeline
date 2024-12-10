@@ -6,16 +6,16 @@
 
 
     <application
-        android:icon="@mipmap/ic_launcher"
+        android:name=".di.KoinApplication"
+        android:icon="@mipmap/edupage_icon"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@mipmap/edupage_icon_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Timeline"
         tools:targetApi="31">
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
             android:theme="@style/Theme.Timeline">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -24,8 +24,16 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".widget.WidgetLoginActivity"
+            android:taskAffinity=""
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE"/>
+            </intent-filter>
+        </activity>
+
         <receiver
-            android:name=".glance.TimelineGlanceWidgetReceiver"
+            android:name=".widget.TimelineGlanceWidgetReceiver"
             android:enabled="true"
             android:exported="false"
             android:label="EduPage Timeline">

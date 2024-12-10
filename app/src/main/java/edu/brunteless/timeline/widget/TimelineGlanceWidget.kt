@@ -1,25 +1,24 @@
-package edu.brunteless.timeline.glance
+package edu.brunteless.timeline.widget
 
 
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.glance.Button
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
-import androidx.glance.action.ActionParameters
-import androidx.glance.action.actionParametersOf
+import androidx.glance.ImageProvider
+import androidx.glance.LocalContext
+import androidx.glance.LocalGlanceId
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.CircularProgressIndicator
 import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.action.ActionCallback
-import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.appWidgetBackground
+import androidx.glance.appwidget.components.CircleIconButton
 import androidx.glance.appwidget.lazy.GridCells
 import androidx.glance.appwidget.lazy.LazyVerticalGrid
 import androidx.glance.appwidget.lazy.itemsIndexed
@@ -42,18 +41,16 @@ import androidx.glance.state.GlanceStateDefinition
 import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
+import edu.brunteless.timeline.R
 import edu.brunteless.timeline.models.RenderLesson
 import edu.brunteless.timeline.models.RenderTimeline
-import edu.brunteless.timeline.models.TimelineGlanceStateDefinition
-import java.time.LocalDateTime
+import edu.brunteless.timeline.workers.TimelineWorker
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 
 
 class TimelineGlanceWidget : GlanceAppWidget() {
-
-    companion object {
-        val indexParameter = ActionParameters.Key<Int>("new_index")
-    }
 
     override val sizeMode: SizeMode = SizeMode.Exact
 
@@ -63,85 +60,113 @@ class TimelineGlanceWidget : GlanceAppWidget() {
     private val dayFormat = DateTimeFormatter.ofPattern("EEEE, dd.MM.yyyy")
 
     override suspend fun onDelete(context: Context, glanceId: GlanceId) {
+        TimelineWorker.stopWorkersForWidget(context, glanceId)
         super.onDelete(context, glanceId)
-        TimelineWorker.stopAllTimelineUpdates(context)
     }
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        provideContent {
-            val timeline = currentState<RenderTimeline>()
 
+        provideContent {
+
+            val timeline = currentState<RenderTimeline>()
             val isLoaded = timeline.lessons.isNotEmpty()
 
             GlanceTheme {
                 Box(
                     modifier = GlanceModifier
-                        .padding(16.dp, 0.dp, 16.dp, 16.dp)
+                        .padding(12.dp)
                         .fillMaxSize()
                         .appWidgetBackground()
                         .background(GlanceTheme.colors.background),
                     contentAlignment = if (isLoaded) Alignment.BottomEnd else Alignment.Center
                 ) {
-                    if (isLoaded) {
-
-                        val lessons = timeline.lessons
-
-                        Column(
-                            modifier = GlanceModifier.fillMaxSize()
-                        ) {
-                            LessonHeader(
-                                lesson = lessons[timeline.currentIndex]!!,
-                                day = timeline.day
-                            )
-
-                            LessonBody(
-                                lessons = lessons,
-                                currentIndex = timeline.currentIndex
-                            )
-                        }
-                        Box(
-                            contentAlignment = Alignment.BottomEnd
-                        ) {
-                            Button(
-                                text = "R",
-                                onClick = {
-                                    TimelineWorker.scheduleTimelineUpdate(context)
-                                },
-                                modifier = GlanceModifier.size(40.dp)
-                            )
-
-                        }
-                    } else {
-                        CircularProgressIndicator(
-                            color = GlanceTheme.colors.onPrimaryContainer
-                        )
-                        SideEffect {
-                            TimelineWorker.scheduleTimelineUpdate(context)
-                        }
+                    when {
+                        timeline.credentials == null -> NoCredentials()
+                        timeline.lessons.isEmpty() -> NoLessons(context, id)
+                        isLoaded -> TimelineContent(context, id, timeline)
+                        else -> ErrorMessage()
                     }
-
                 }
             }
         }
     }
 
+    @Composable
+    private fun ErrorMessage() {
+        Text(
+            text = "Unhandled illegal state!",
+            style = TextStyle(
+                color = GlanceTheme.colors.onErrorContainer
+            )
+        )
+    }
 
     @Composable
-    fun LessonHeader(
-        lesson: RenderLesson,
-        day: LocalDateTime
+    private fun NoLessons(context: Context, id: GlanceId) {
+        CircularProgressIndicator(
+            color = GlanceTheme.colors.onPrimaryContainer
+        )
+        SideEffect {
+            TimelineWorker.scheduleTimelineUpdate(context, id)
+        }
+    }
+
+    @Composable
+    private fun NoCredentials() {
+        Text(
+            "No credentials were provided.",
+            style = TextStyle(
+                color = GlanceTheme.colors.onPrimaryContainer
+            )
+        )
+    }
+
+    @Composable
+    private fun TimelineContent(
+        context: Context,
+        id: GlanceId,
+        timeline: RenderTimeline
     ) {
-        Spacer(modifier = GlanceModifier.height(3.dp))
+        Column(
+            modifier = GlanceModifier.fillMaxSize()
+        ) {
+            LessonHeader(timeline = timeline)
+            LessonBody(
+                lessons = timeline.lessons,
+                currentIndex = timeline.currentIndex
+            )
+        }
+        Box(
+            contentAlignment = Alignment.BottomEnd
+        ) {
+            CircleIconButton(
+                imageProvider = ImageProvider(resId = R.drawable.icon_refresh),
+                onClick = {
+                    TimelineWorker.scheduleTimelineUpdate(context, id)
+                },
+                contentDescription = "Refresh EduPage Timeline",
+                modifier = GlanceModifier.size(32.dp)
+            )
+        }
+    }
+
+
+    @Composable
+    private fun LessonHeader(
+        timeline: RenderTimeline
+    ) {
+        val lesson = timeline.lessons[timeline.currentIndex]!!
 
         Text(
-            text = dayFormat.format(day),
+            text = dayFormat.format(timeline.day),
             style = TextStyle(
-                fontSize = 16.sp,
+                fontSize = 14.sp,
                 color = GlanceTheme.colors.onPrimaryContainer,
                 textAlign = TextAlign.Center
             ),
             modifier = GlanceModifier.fillMaxWidth()
         )
+
 
         Row(
             modifier = GlanceModifier
@@ -202,10 +227,15 @@ class TimelineGlanceWidget : GlanceAppWidget() {
     }
 
     @Composable
-    fun LessonBody(
+    private fun LessonBody(
         lessons: List<RenderLesson?>,
-        currentIndex: Int
+        currentIndex: Int,
     ) {
+
+        val context = LocalContext.current
+        val id = LocalGlanceId.current
+        val scope = rememberCoroutineScope()
+
         LazyVerticalGrid(
             gridCells = GridCells.Fixed(5)
         ) {
@@ -223,9 +253,12 @@ class TimelineGlanceWidget : GlanceAppWidget() {
                     else -> {
                         LessonTile(
                             lesson = lesson,
-                            index = index,
                             buttonModifier = buttonModifier
-                        )
+                        ) {
+                            scope.launch(Dispatchers.IO) {
+                                changeLessonIndex(context, id, index)
+                            }
+                        }
                     }
                 }
             }
@@ -235,19 +268,14 @@ class TimelineGlanceWidget : GlanceAppWidget() {
 
 
     @Composable
-    fun LessonTile(
+    private fun LessonTile(
         lesson: RenderLesson,
-        index: Int,
-        buttonModifier: GlanceModifier
+        buttonModifier: GlanceModifier,
+        onClick: () -> Unit
     ) {
         Box (
             contentAlignment = Alignment.Center,
-            modifier = buttonModifier
-                .clickable(
-                    actionRunCallback<ChangeLessonAction>(
-                        actionParametersOf(indexParameter to index)
-                    )
-                ),
+            modifier = buttonModifier.clickable(onClick),
         ) {
             Text(
                 text = lesson.period.toString() + '\n' + lesson.shortName,
@@ -259,25 +287,16 @@ class TimelineGlanceWidget : GlanceAppWidget() {
             )
         }
     }
-}
 
-class ChangeLessonAction : ActionCallback {
-    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-
-        val newIndex = parameters[TimelineGlanceWidget.indexParameter]!!
-
+    private suspend fun changeLessonIndex(context: Context, id: GlanceId, newIndex: Int) {
         updateAppWidgetState(
             context = context,
-            glanceId = glanceId,
+            glanceId = id,
             definition = TimelineGlanceStateDefinition,
         ) {
             it.copy(currentIndex = newIndex)
         }
 
-        TimelineGlanceWidget().update(context, glanceId)
+        TimelineGlanceWidget().update(context, id)
     }
-}
-
-class TimelineGlanceWidgetReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = TimelineGlanceWidget()
 }

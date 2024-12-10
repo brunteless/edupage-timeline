@@ -25,17 +25,15 @@ class EdupageRepository(
 
     companion object {
         private const val LOGIN_URL = "https://login1.edupage.org/login/mauth"
-        private const val USERNAME = ""
-        private const val PASSWORD = ""
     }
 
     private val dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     private val syncFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
 
-    suspend fun getCredentials() : Tokens {
+    suspend fun getCredentials(username: String, password: String) : Tokens {
         return httpClient
-            .submitForm(LOGIN_URL, loginParameters) {
+            .submitForm(LOGIN_URL, getLoginParameters(username, password)) {
                 loginHeaders
             }
             .body<EdupageLoginDto>()
@@ -131,11 +129,10 @@ class EdupageRepository(
         }
     }
 
-    private val loginParameters: Parameters
-        get() {
+    private fun getLoginParameters(username: String, password: String): Parameters {
             return parameters {
-                append("m", USERNAME)
-                append("h", PASSWORD)
+                append("m", username)
+                append("h", password)
                 append("utyp", "")
                 append("edupage", "")
                 append("plgc", "")
