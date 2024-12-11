@@ -7,6 +7,16 @@ plugins {
 }
 
 android {
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("../keystore.jks")
+            keyAlias = System.getenv("KEY_ALIAS")
+            keyPassword = System.getenv("KEY_PASSWORD")
+            storePassword = System.getenv("KEYSTORE_PASSWORD")
+        }
+    }
+
     namespace = "edu.brunteless.timeline"
     compileSdk = 35
 
@@ -15,7 +25,7 @@ android {
         minSdk = 28
         targetSdk = 35
         versionCode = 1
-        versionName = "0.2"
+        versionName = "0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -24,10 +34,13 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
