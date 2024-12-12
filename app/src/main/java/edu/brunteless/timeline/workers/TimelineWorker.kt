@@ -98,8 +98,6 @@ class TimelineWorker(
         val shouldBeNextDay = inputData.getBoolean(KEY_NEXT_DAY, false)
         val widgetId = inputData.getInt(KEY_WIDGET_ID, -1)
 
-        IndexUpdateWorker.stopWorkersForWidget(workManager, widgetId)
-
         val timeline: RenderTimeline = getTimeline(shouldBeNextDay, widgetId)
 
         updateWidget(widgetId, timeline)
@@ -166,12 +164,11 @@ class TimelineWorker(
         lessons
             .dropLast(1)
             .forEachIndexed { index, lesson ->
-                val delay = timeline.getDelayDuration(lesson.value!!)
                 IndexUpdateWorker.scheduleIndexUpdate(
                     workManager,
                     widgetId,
                     lessons[index+1].index,
-                    delay
+                    timeline.getLessonEndTime(lesson.value!!)
                 )
             }
     }

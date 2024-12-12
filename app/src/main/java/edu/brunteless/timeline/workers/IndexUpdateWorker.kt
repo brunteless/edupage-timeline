@@ -7,6 +7,8 @@ import androidx.work.*
 import edu.brunteless.timeline.widget.TimelineGlanceStateDefinition
 import edu.brunteless.timeline.widget.TimelineGlanceWidget
 import java.time.Duration
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 
 class IndexUpdateWorker(
@@ -18,20 +20,29 @@ class IndexUpdateWorker(
         private const val WORK_NAME_PREFIX = "index_update_worker"
         private const val KEY_NEW_INDEX = "${WORK_NAME_PREFIX}_new_index_value"
         private const val KEY_WIDGET_ID = "${WORK_NAME_PREFIX}_widget_id"
+        private val timeFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
         fun stopWorkersForWidget(workManager: WorkManager, widgetId: Int) {
             workManager.cancelAllWorkByTag(getTagForWork(widgetId))
         }
 
-        private fun getTagForWork(widgetId: Int) = "${WORK_NAME_PREFIX}_index_update_for_${widgetId}"
+        private fun getTagForWork(widgetId: Int) =
+            "${WORK_NAME_PREFIX}_${widgetId}_work_tag"
+
+        private fun getUniqueWorkName(widgetId: Int, time: LocalDateTime) =
+            "${WORK_NAME_PREFIX}_${widgetId}_${timeFormat.format(time)}_unique"
+
+        private fun getDelayDuration(time: LocalDateTime) =
+            Duration.between(LocalDateTime.now(), time)
 
         fun scheduleIndexUpdate(
             workManager: WorkManager,
             widgetId: Int,
             newIndex: Int,
-            delay: Duration
+            time: LocalDateTime
         ) {
 
+            val delay = getDelayDuration(time)
             if (delay.isNegative) return
 
             val immediateRequest = OneTimeWorkRequestBuilder<IndexUpdateWorker>()
@@ -46,8 +57,8 @@ class IndexUpdateWorker(
                 .build()
 
             workManager.enqueueUniqueWork(
-                getTagForWork(widgetId),
-                ExistingWorkPolicy.APPEND,
+                getUniqueWorkName(widgetId, time),
+                ExistingWorkPolicy.REPLACE,
                 immediateRequest
             )
         }
@@ -74,7 +85,10 @@ class IndexUpdateWorker(
             glanceId = glanceId,
             definition = TimelineGlanceStateDefinition,
         ) {
-            it.copy(currentIndex = newIndex)
+            if (it.lessons[newIndex] == null)
+                it
+            else
+                it.copy(currentIndex = newIndex)
         }
 
         TimelineGlanceWidget().update(context, glanceId)
