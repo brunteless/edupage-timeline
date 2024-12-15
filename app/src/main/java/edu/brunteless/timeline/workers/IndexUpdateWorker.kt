@@ -42,7 +42,7 @@ class IndexUpdateWorker(
             time: LocalDateTime
         ) {
 
-            val delay = getDelayDuration(time)
+            val delay = getDelayDuration(time.minusMinutes(3))
             if (delay.isNegative) return
 
             val immediateRequest = OneTimeWorkRequestBuilder<IndexUpdateWorker>()
