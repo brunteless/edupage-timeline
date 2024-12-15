@@ -1,6 +1,7 @@
 package edu.brunteless.timeline.workers
 
 import android.content.Context
+import android.util.Log
 import androidx.glance.GlanceId
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.getAppWidgetState
@@ -15,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import java.time.Duration
 import java.time.LocalDateTime
 
 
@@ -45,20 +47,43 @@ class TimelineWorker(
             val workManager = WorkManager.getInstance(context)
             val widgetId = GlanceAppWidgetManager(context).getAppWidgetId(glanceId)
 
+            scheduleTimelineUpdate(workManager, widgetId)
+        }
+
+        private fun scheduleTimelineUpdate(
+            workManager: WorkManager,
+            widgetId: Int,
+            delay: Duration? = null
+        ) {
             val immediateRequest = OneTimeWorkRequestBuilder<TimelineWorker>()
                 .addTag(getTagForWork(widgetId))
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .setConstraints(CONSTRAINTS)
                 .setInputData(
                     Data.Builder()
                         .putInt(KEY_WIDGET_ID, widgetId)
+                        .putBoolean(KEY_NEXT_DAY, delay != null)
                         .build()
                 )
+                .apply {
+                    when (delay) {
+                        null -> setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                        else -> {
+                            Log.d(
+                                TimelineWorker::class.simpleName,
+                                "scheduling timeline update with delay of $delay"
+                            )
+                            setInitialDelay(delay)
+                        }
+                    }
+                }
                 .build()
 
             workManager.enqueueUniqueWork(
                 getTagForWork(widgetId),
-                ExistingWorkPolicy.REPLACE,
+                when (delay) {
+                    null -> ExistingWorkPolicy.REPLACE
+                    else -> ExistingWorkPolicy.APPEND
+                },
                 immediateRequest
             )
         }
@@ -73,40 +98,14 @@ class TimelineWorker(
         val shouldBeNextDay = inputData.getBoolean(KEY_NEXT_DAY, false)
         val widgetId = inputData.getInt(KEY_WIDGET_ID, -1)
 
-        IndexUpdateWorker.stopWorkersForWidget(workManager, widgetId)
-
         val timeline: RenderTimeline = getTimeline(shouldBeNextDay, widgetId)
 
         updateWidget(widgetId, timeline)
-        scheduleNextUpdate(workManager, widgetId, timeline)
+
+        scheduleTimelineUpdate(workManager, widgetId, timeline.timeUntilLastLessonEnds)
         scheduleIndexUpdates(workManager, widgetId, timeline)
 
         return Result.success()
-    }
-
-    private fun scheduleNextUpdate(workManager: WorkManager, widgetId: Int, timeline: RenderTimeline) {
-
-        val lastLesson = timeline.lessons.last()!!
-
-        val delay = timeline.getDelayDuration(lastLesson)
-
-        val worker = OneTimeWorkRequestBuilder<TimelineWorker>()
-            .addTag(getTagForWork(widgetId))
-            .setInitialDelay(delay)
-            .setConstraints(CONSTRAINTS)
-            .setInputData(
-                Data.Builder()
-                    .putBoolean(KEY_NEXT_DAY, true)
-                    .putInt(KEY_WIDGET_ID, widgetId)
-                    .build()
-            )
-            .build()
-
-        workManager.enqueueUniqueWork(
-            getTagForWork(widgetId),
-            ExistingWorkPolicy.APPEND,
-            worker
-        )
     }
 
     private suspend fun updateWidget(widgetId: Int, timeline: RenderTimeline) {
@@ -157,23 +156,21 @@ class TimelineWorker(
     }
 
     private fun scheduleIndexUpdates(workManager: WorkManager, widgetId: Int, timeline: RenderTimeline) {
-
         val lessons = timeline.lessons
             .withIndex()
             .filter { it.value != null }
-            .dropLast(1)
             .toList()
 
-        for (i in 0..<lessons.size) {
-            val delay = timeline.getDelayDuration(lessons[i].value!!)
-
-            IndexUpdateWorker.scheduleIndexUpdate(
-                workManager,
-                widgetId,
-                lessons[i+1].index,
-                delay
-            )
-        }
+        lessons
+            .dropLast(1)
+            .forEachIndexed { index, lesson ->
+                IndexUpdateWorker.scheduleIndexUpdate(
+                    workManager,
+                    widgetId,
+                    lessons[index+1].index,
+                    timeline.getLessonEndTime(lesson.value!!)
+                )
+            }
     }
 
     private fun getCurrentDay(shouldBeNextDay: Boolean, state: RenderTimeline): LocalDateTime {

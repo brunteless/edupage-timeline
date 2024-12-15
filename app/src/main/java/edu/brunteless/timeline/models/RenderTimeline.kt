@@ -18,17 +18,19 @@ data class RenderTimeline(
     fun getDelayDuration(lesson: RenderLesson) : Duration {
         return Duration.between(
             LocalDateTime.now(),
-            day.lessonEndTime(lesson)
+            getLessonEndTime(lesson)
         )
     }
 
+    val timeUntilLastLessonEnds: Duration
+        get() = getDelayDuration(lessons.last()!!)
 
     fun isNotLatest() = lessons.isEmpty() || getDelayDuration(lessons.last()!!).isNegative
 
 
-    private fun LocalDateTime.lessonEndTime(lesson: RenderLesson) : LocalDateTime {
+    fun getLessonEndTime(lesson: RenderLesson) : LocalDateTime {
         val (hours, minutes) = lesson.endTime.split(':').map { it.toInt() }.toIntArray()
-        return this
+        return day
             .withHour(hours)
             .withMinute(minutes)
             .withSecond(0)
